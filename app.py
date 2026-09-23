@@ -398,12 +398,7 @@ def generar_etiqueta(descripcion, color, talle, codigo, precio_sin_iva, sku="", 
     font_digitos = ImageFont.truetype(FONT_REGULAR, size=round(1.45 * px_mm))
 
     y = margen
-    max_w = col_izq_ancho - margen
-    for linea in _texto_ajustado(draw, str(descripcion).upper(), font_desc, max_w, max_lineas=2):
-        draw.text((margen, y), linea, font=font_desc, fill=0)
-        y += draw.textbbox((0, 0), linea, font=font_desc)[3] + round(0.25 * px_mm)
-
-    draw.text((margen, y + round(0.25 * px_mm)), f"{str(color).upper()}  {str(talle).upper()}", font=font_meta, fill=0)
+    draw.text((margen, y), f"{str(color).upper()}  {str(talle).upper()}", font=font_meta, fill=0)
     y += round(2.35 * px_mm)
     if sku:
         draw.text((margen, y), str(sku).strip(), font=font_meta, fill=0)
