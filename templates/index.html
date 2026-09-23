@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Equivalencia de Códigos de Barra</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #171a21;
+      --border: #2a2e38;
+      --text: #e8eaed;
+      --muted: #9aa1ac;
+      --accent: #5b8cff;
+      --accent-hover: #4a76e0;
+      --ok: #3ecf8e;
+      --warn: #e0a13e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .wrap { width: 100%; max-width: 640px; }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    p.sub { color: var(--muted); margin-top: 0; margin-bottom: 28px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .card h2 { font-size: 1.05rem; margin: 0 0 6px 0; }
+    .card .desc { color: var(--muted); font-size: 0.9rem; margin-bottom: 16px; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    input[type="file"] {
+      width: 100%;
+      padding: 10px;
+      background: #0f1115;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--ok);
+      margin-top: 10px;
+    }
+    .status.warn { color: var(--warn); }
+    button {
+      width: 100%;
+      padding: 13px;
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    button:hover { background: var(--accent-hover); }
+    .flash {
+      background: #3a2020;
+      border: 1px solid #7a3a3a;
+      color: #ffb4b4;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+    }
+    .footer-note {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-align: center;
+      margin-top: 24px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Equivalencia de Códigos de Barra</h1>
+    <p class="sub">Completa EQUIVALENCIA con el código de barra de cada prenda, cruzando SKU + Color + Talle contra la planilla de equivalencias.</p>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        {% for m in messages %}
+          <div class="flash">{{ m }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form action="/procesar" method="post" enctype="multipart/form-data">
+      <div class="card">
+        <h2>1. Planilla grande (Equivalencia)</h2>
+        <div class="desc">El export con todos los productos y su columna CODIGOS. Podés omitir este paso si ya subiste una antes: se reutiliza la última cargada.</div>
+        <label for="grande">Archivo .xls / .xlsx</label>
+        <input type="file" id="grande" name="grande" accept=".xls,.xlsx">
+        {% if grande_cached %}
+          <div class="status">● Hay una planilla grande cargada: {{ grande_info }}</div>
+        {% else %}
+          <div class="status warn">● Todavía no cargaste ninguna. Es obligatorio la primera vez.</div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <h2>2. Planilla de stock</h2>
+        <div class="desc">La planilla de stock a completar: usa SKU, COLOR y TALLE (columnas C, D y E en tu archivo).</div>
+        <label for="pedido">Archivo .xlsx (debe tener columnas EQUIVALENCIA, SKU, COLOR y TALLE)</label>
+        <input type="file" id="pedido" name="pedido" accept=".xlsx" required>
+      </div>
+
+      <button type="submit">Procesar y descargar resultado</button>
+    </form>
+
+    <form action="/subir-stock" method="post" enctype="multipart/form-data">
+      <div class="card">
+        <h2>Planilla STOCK con precios</h2>
+        <div class="desc">Subí el STOCK actualizado. La etiqueta toma RETAIL de la columna K como precio sin IVA y calcula IVA 21%.</div>
+        <label for="stock">Archivo .xlsx</label>
+        <input type="file" id="stock" name="stock" accept=".xlsx" required>
+        {% if stock_cached %}
+          <div class="status">Planilla cargada: {{ stock_info }}</div>
+        {% else %}
+          <div class="status warn">Todavía no cargaste la planilla STOCK.</div>
+        {% endif %}
+        <button type="submit">Guardar STOCK y precios</button>
+      </div>
+    </form>
+
+    <div class="footer-note">
+      Busca por SKU + Color + Talle exacto y completa la primera columna "EQUIVALENCIA"
+      con el valor de CODIGOS de la planilla de equivalencias. El resto de la planilla queda intacta.
+    </div>
+
+    <div class="card" style="text-align:center;">
+      <h2>¿Necesitás reimprimir una etiqueta suelta?</h2>
+      <div class="desc">Generá una etiqueta de 4 x 2 cm a partir del código, color, talle y descripción.</div>
+      <a class="btn" href="/etiqueta" style="display:inline-block; padding:12px 24px; background:var(--accent); color:white; border-radius:8px; text-decoration:none; font-weight:600;">Generar etiqueta</a>
+    </div>
+  </div>
+</body>
+</html>
