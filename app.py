@@ -389,28 +389,36 @@ def _money(amount):
 
 
 def generar_etiqueta(descripcion, color, talle, codigo, precio_sin_iva, sku="", dpi=300):
-    """Genera una etiqueta de 30 x 15 mm, PNG a 300 DPI."""
+    """Genera una etiqueta vertical de 15 x 30 mm, PNG a 300 DPI."""
     px_mm = dpi / 25.4
-    ancho_mm, alto_mm = 30.0, 15.0
+    ancho_mm, alto_mm = 15.0, 30.0
     W, H = round(ancho_mm * px_mm), round(alto_mm * px_mm)
     img = Image.new("L", (W, H), color=255)
     draw = ImageDraw.Draw(img)
 
     margen = round(0.8 * px_mm)
-    col_izq_ancho = round(15.0 * px_mm)
-    font_desc = ImageFont.truetype(FONT_REGULAR, size=round(1.55 * px_mm))
-    font_meta = ImageFont.truetype(FONT_REGULAR, size=round(1.55 * px_mm))
+    font_meta = ImageFont.truetype(FONT_REGULAR, size=round(1.65 * px_mm))
     font_price_label = ImageFont.truetype(FONT_REGULAR, size=round(1.35 * px_mm))
-    font_price = ImageFont.truetype(FONT_BOLD, size=round(2.05 * px_mm))
-    font_digitos = ImageFont.truetype(FONT_REGULAR, size=round(1.45 * px_mm))
+    font_price = ImageFont.truetype(FONT_BOLD, size=round(1.9 * px_mm))
+    font_digitos = ImageFont.truetype(FONT_REGULAR, size=round(1.35 * px_mm))
 
-    y = margen
-    draw.text((margen, y), f"{str(color).upper()}  {str(talle).upper()}", font=font_meta, fill=0)
-    y += round(2.35 * px_mm)
+    codigo_str = str(codigo).strip()
+    barcode_width = W - (2 * margen)
+    bc_img = _generar_imagen_codigo_barra(codigo_str, module_height_mm=7.0, module_width_mm=0.22)
+    escala = barcode_width / bc_img.width
+    bc_alto = min(round(bc_img.height * escala), round(8.5 * px_mm))
+    bc_img = bc_img.resize((barcode_width, bc_alto))
+    img.paste(bc_img, (margen, margen))
+    bbox = draw.textbbox((0, 0), codigo_str, font=font_digitos)
+    digitos_x = margen + max(0, (barcode_width - (bbox[2] - bbox[0])) // 2)
+    draw.text((digitos_x, margen + bc_alto + round(0.25 * px_mm)), codigo_str, font=font_digitos, fill=0)
+
+    y = margen + bc_alto + round(2.25 * px_mm)
     if sku:
         draw.text((margen, y), str(sku).strip(), font=font_meta, fill=0)
-        y += round(2.0 * px_mm)
-
+        y += round(2.1 * px_mm)
+    draw.text((margen, y), f"{str(color).upper()}  {str(talle).upper()}", font=font_meta, fill=0)
+    y += round(2.35 * px_mm)
     draw.text((margen, y), "SIN IVA", font=font_price_label, fill=0)
     y += round(1.55 * px_mm)
     draw.text((margen, y), _money(precio_sin_iva), font=font_price, fill=0)
@@ -418,19 +426,6 @@ def generar_etiqueta(descripcion, color, talle, codigo, precio_sin_iva, sku="", 
     draw.text((margen, y), "CON IVA", font=font_price_label, fill=0)
     y += round(1.55 * px_mm)
     draw.text((margen, y), _money(round(precio_sin_iva * 1.21)), font=font_price, fill=0)
-
-    codigo_str = str(codigo).strip()
-    col_der_x = margen + col_izq_ancho + round(0.5 * px_mm)
-    col_der_ancho = W - col_der_x - margen
-    bc_img = _generar_imagen_codigo_barra(codigo_str, module_height_mm=7.0, module_width_mm=0.22)
-    escala = col_der_ancho / bc_img.width
-    bc_alto = min(round(bc_img.height * escala), round(9.3 * px_mm))
-    bc_img = bc_img.resize((col_der_ancho, bc_alto))
-    bc_y = margen
-    img.paste(bc_img, (col_der_x, bc_y))
-    bbox = draw.textbbox((0, 0), codigo_str, font=font_digitos)
-    digitos_x = col_der_x + max(0, (col_der_ancho - (bbox[2] - bbox[0])) // 2)
-    draw.text((digitos_x, bc_y + bc_alto + round(0.25 * px_mm)), codigo_str, font=font_digitos, fill=0)
 
     salida = io.BytesIO()
     img.save(salida, format="PNG", dpi=(dpi, dpi))
