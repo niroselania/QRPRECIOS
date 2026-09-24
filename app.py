@@ -1,6 +1,7 @@
 import io
 import os
 import textwrap
+import unicodedata
 from collections import Counter, defaultdict
 from datetime import datetime
 
@@ -33,6 +34,11 @@ FONT_REGULAR = os.path.join(BASE_DIR, "fonts", "DejaVuSans.ttf")
 
 def _ext(filename):
     return os.path.splitext(filename)[1].lower()
+
+
+def _encabezado(valor):
+    texto = unicodedata.normalize("NFKD", str(valor).strip()).encode("ascii", "ignore").decode()
+    return " ".join(texto.upper().split())
 
 
 def _texto(valor):
@@ -83,8 +89,9 @@ def _read_grande(path):
             for columna, valor in enumerate(df.iloc[0])
             if not pd.isna(valor) and str(valor).strip()
         }
-        col_codigo = _buscar_columna(encabezados, "CODIGO", "CODIGOS", "CODIGO DE BARRA")
-        col_articulo = _buscar_columna(encabezados, "ARTICULO", "SKU COLOR", "CONCAT")
+        encabezados = {_encabezado(nombre): columna for nombre, columna in encabezados.items()}
+        col_codigo = _buscar_columna(encabezados, "CODIGO", "CODIGOS", "CODIGO DE BARRA", "CODIGOS DE BARRA", "BARRA", "BARRAS", "BARR", "BARCODE")
+        col_articulo = _buscar_columna(encabezados, "ARTICULO", "ARTICULOS", "ARTIC", "SKU COLOR", "CONCAT")
         col_sku = _buscar_columna(encabezados, "SKU")
         col_color = _buscar_columna(encabezados, "COLOR")
         col_talle = _buscar_columna(encabezados, "TALLE")
