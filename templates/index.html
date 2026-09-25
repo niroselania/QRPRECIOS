@@ -125,6 +125,37 @@
       text-align: left;
     }
     .opciones button:hover { background: #363b47; }
+    @media print {
+      @page { size: 15mm 30mm; margin: 0; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: white;
+        width: 15mm;
+        height: 30mm;
+      }
+      body * { visibility: hidden; }
+      #preview, #preview img { visibility: visible; }
+      #preview {
+        position: absolute;
+        left: 0;
+        top: 0;
+        margin: 0;
+        padding: 0;
+        border: none;
+        border-radius: 0;
+        background: white;
+        min-height: 0;
+        width: 15mm;
+        height: 30mm;
+        display: flex !important;
+      }
+      #preview img {
+        width: 15mm;
+        height: 30mm;
+        max-width: none;
+      }
+    }
   </style>
 </head>
 <body>
@@ -196,7 +227,7 @@
         <div class="opciones" id="opciones"></div>
         <div class="botones">
           <button type="submit" id="btn-preview">Previsualizar</button>
-          <a class="btn secondary" id="link-descargar" href="#">Descargar PNG</a>
+          <a class="btn secondary" id="link-imprimir" href="#">Imprimir</a>
         </div>
       </form>
       <div class="preview" id="preview">
@@ -205,7 +236,7 @@
     </div>
 
     <div class="footer-note">
-      La lectora suele mandar Enter al final. Si el código no está, usá el SKU: si hay varios colores con distinto precio, elegí uno de la lista. El PNG sale a 300 DPI en 15 x 30 mm.
+      La lectora suele mandar Enter al final. Si el código no está, usá el SKU: si hay varios colores con distinto precio, elegí uno de la lista. Imprimí a tamaño real, 15 x 30 mm.
     </div>
   </div>
 
@@ -305,12 +336,21 @@
       generar(false);
     });
 
-    document.getElementById('link-descargar').addEventListener('click', (event) => {
+    document.getElementById('link-imprimir').addEventListener('click', async (event) => {
       event.preventDefault();
-      generar(true);
+      const ok = await generar();
+      if (!ok) return;
+      if (previewImg.complete) {
+        window.print();
+        return;
+      }
+      previewImg.onload = () => {
+        previewImg.onload = null;
+        window.print();
+      };
     });
 
-    async function generar(descargar) {
+    async function generar() {
       const code = normalizeBarcode(barcodeField.value);
       const sku = skuField.value.trim();
       const color = colorField.value.trim();
@@ -318,13 +358,13 @@
 
       if (!code && !sku) {
         showError('Escaneá un código de barras o ingresá el SKU.');
-        return;
+        return false;
       }
       if (code && code.length < 8 && !sku) {
         showError('El código de barras está incompleto. Si no está, usá el SKU.');
-        return;
+        return false;
       }
-      if (!descargar && claveActual() === lastGenerated) return;
+      if (claveActual() === lastGenerated && preview.classList.contains('visible')) return true;
 
       clearTimeout(idleTimer);
       if (inflight) inflight.abort();
@@ -339,7 +379,6 @@
         if (code.length >= 8) body.set('barcode', code);
         if (sku) body.set('sku', sku);
         if (color) body.set('color', color);
-        if (descargar) body.set('descargar', '1');
         const response = await fetch('/etiqueta/generar', {
           method: 'POST',
           headers: {
@@ -358,12 +397,12 @@
             const data = await response.json();
             if (data.opciones && data.opciones.length) {
               mostrarOpciones(data.opciones);
-              return;
+              return false;
             }
             if (data.error) message = data.error;
           } catch (_) {}
           showError(message);
-          return;
+          return false;
         }
 
         const blob = await response.blob();
@@ -374,17 +413,10 @@
         lastGenerated = claveActual();
         if (code) barcodeField.select();
         else skuField.select();
-
-        if (descargar) {
-          const link = document.createElement('a');
-          link.href = previewUrl;
-          link.download = 'etiqueta_' + (code || sku) + '.png';
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-        }
+        return true;
       } catch (error) {
         if (error.name !== 'AbortError') showError('Se cortó la generación. Volvé a intentar.');
+        return false;
       } finally {
         setBusy(false);
         inflight = null;
