@@ -49,6 +49,7 @@
       font-size: 0.95rem;
     }
     input[type="text"] { border-style: solid; font-size: 1.15rem; letter-spacing: 0.04em; }
+    input[type="text"].sku { font-size: 1rem; letter-spacing: 0; }
     .status {
       display: inline-flex;
       align-items: center;
@@ -113,12 +114,23 @@
       line-height: 1.5;
     }
     .busy { color: var(--muted); font-size: 0.85rem; margin-top: 10px; display: none; }
+    .dos-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    @media (max-width: 520px) { .dos-campos { grid-template-columns: 1fr; } }
+    .opciones { display: none; margin-top: 14px; }
+    .opciones.visible { display: block; }
+    .opciones button {
+      background: #2a2e38;
+      font-size: 0.9rem;
+      margin-top: 8px;
+      text-align: left;
+    }
+    .opciones button:hover { background: #363b47; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>Etiquetas</h1>
-    <p class="sub">Cargá las planillas una vez y después escaneá o pegá el código de barras para imprimir la etiqueta con precio sin IVA y con IVA.</p>
+    <p class="sub">Cargá las planillas una vez. La etiqueta solo muestra precio sin IVA y con IVA. Si no hay código de barras, buscá por SKU.</p>
 
     {% with messages = get_flashed_messages() %}
       {% if messages %}
@@ -160,15 +172,28 @@
 
     <div class="card">
       <h2>3. Generar etiqueta (15 x 30 mm)</h2>
-      <div class="desc">Pegá el número o escanealo con la lectora. Al terminar el beep, la etiqueta se arma sola.</div>
-      {% if not grande_cached or not stock_cached %}
-        <div class="flash">Falta cargar equivalencia y stock antes de generar etiquetas.</div>
+      <div class="desc">Escaneá el código o, si no está, ingresá el SKU. La etiqueta sale solo con los dos precios.</div>
+      {% if not stock_cached %}
+        <div class="flash">Falta cargar el STOCK antes de generar etiquetas.</div>
+      {% elif not grande_cached %}
+        <div class="flash">Sin equivalencia solo se puede buscar por SKU, no por código de barras.</div>
       {% endif %}
       <form id="form-etiqueta" autocomplete="off">
         <label for="barcode">Código de barras</label>
         <input type="text" id="barcode" name="barcode" placeholder="Escaneá o pegá el código" inputmode="numeric" autofocus>
+        <div class="dos-campos">
+          <div>
+            <label for="sku">SKU (si no hay código)</label>
+            <input class="sku" type="text" id="sku" name="sku" placeholder="Ej. 28465">
+          </div>
+          <div>
+            <label for="color">Color (opcional)</label>
+            <input class="sku" type="text" id="color" name="color" placeholder="Si el SKU tiene varios">
+          </div>
+        </div>
         <div class="busy" id="busy">Generando etiqueta…</div>
         <div class="flash" id="error" style="display:none; margin:12px 0 0;"></div>
+        <div class="opciones" id="opciones"></div>
         <div class="botones">
           <button type="submit" id="btn-preview">Previsualizar</button>
           <a class="btn secondary" id="link-descargar" href="#">Descargar PNG</a>
@@ -180,15 +205,18 @@
     </div>
 
     <div class="footer-note">
-      La lectora suele mandar Enter al final: con eso alcanza. Si no lo manda, se espera a que deje de escribir y recién ahí se busca el producto. El PNG sale a 300 DPI en 15 x 30 mm.
+      La lectora suele mandar Enter al final. Si el código no está, usá el SKU: si hay varios colores con distinto precio, elegí uno de la lista. El PNG sale a 300 DPI en 15 x 30 mm.
     </div>
   </div>
 
   <script>
     const barcodeField = document.getElementById('barcode');
+    const skuField = document.getElementById('sku');
+    const colorField = document.getElementById('color');
     const preview = document.getElementById('preview');
     const previewImg = document.getElementById('preview-img');
     const errorBox = document.getElementById('error');
+    const opcionesBox = document.getElementById('opciones');
     const busy = document.getElementById('busy');
     const btnPreview = document.getElementById('btn-preview');
     const form = document.getElementById('form-etiqueta');
@@ -212,6 +240,26 @@
       btnPreview.disabled = on;
     }
 
+    function claveActual() {
+      return [normalizeBarcode(barcodeField.value), skuField.value.trim(), colorField.value.trim()].join('|');
+    }
+
+    function mostrarOpciones(opciones) {
+      opcionesBox.innerHTML = '<div class="desc">Ese SKU tiene varios colores. Elegí uno:</div>';
+      opciones.forEach((op) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = (op.color || 'Sin color') + '  ·  $ ' + Number(op.precio_sin_iva).toLocaleString('es-AR');
+        btn.addEventListener('click', () => {
+          colorField.value = op.color || '';
+          skuField.value = op.sku || skuField.value;
+          generar(false);
+        });
+        opcionesBox.appendChild(btn);
+      });
+      opcionesBox.classList.add('visible');
+    }
+
     function scheduleGenerate() {
       clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
@@ -231,8 +279,24 @@
     barcodeField.addEventListener('input', () => {
       const code = normalizeBarcode(barcodeField.value);
       if (barcodeField.value !== code) barcodeField.value = code;
-      if (code && code !== lastGenerated) lastGenerated = '';
-      if (code.length >= 8) scheduleGenerate();
+      if (code) {
+        skuField.value = '';
+        colorField.value = '';
+        lastGenerated = '';
+        if (code.length >= 8) scheduleGenerate();
+      }
+    });
+
+    skuField.addEventListener('input', () => {
+      if (skuField.value.trim()) barcodeField.value = '';
+      lastGenerated = '';
+    });
+
+    skuField.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        generar(false);
+      }
     });
 
     form.addEventListener('submit', (event) => {
@@ -248,12 +312,19 @@
 
     async function generar(descargar) {
       const code = normalizeBarcode(barcodeField.value);
+      const sku = skuField.value.trim();
+      const color = colorField.value.trim();
       barcodeField.value = code;
-      if (code.length < 8) {
-        showError('El código de barras está incompleto.');
+
+      if (!code && !sku) {
+        showError('Escaneá un código de barras o ingresá el SKU.');
         return;
       }
-      if (!descargar && code === lastGenerated) return;
+      if (code && code.length < 8 && !sku) {
+        showError('El código de barras está incompleto. Si no está, usá el SKU.');
+        return;
+      }
+      if (!descargar && claveActual() === lastGenerated) return;
 
       clearTimeout(idleTimer);
       if (inflight) inflight.abort();
@@ -261,8 +332,13 @@
 
       setBusy(true);
       showError('');
+      opcionesBox.classList.remove('visible');
+      opcionesBox.innerHTML = '';
       try {
-        const body = new URLSearchParams({ barcode: code });
+        const body = new URLSearchParams();
+        if (code.length >= 8) body.set('barcode', code);
+        if (sku) body.set('sku', sku);
+        if (color) body.set('color', color);
         if (descargar) body.set('descargar', '1');
         const response = await fetch('/etiqueta/generar', {
           method: 'POST',
@@ -280,6 +356,10 @@
           let message = 'No pude generar la etiqueta.';
           try {
             const data = await response.json();
+            if (data.opciones && data.opciones.length) {
+              mostrarOpciones(data.opciones);
+              return;
+            }
             if (data.error) message = data.error;
           } catch (_) {}
           showError(message);
@@ -291,19 +371,20 @@
         previewUrl = URL.createObjectURL(blob);
         previewImg.src = previewUrl;
         preview.classList.add('visible');
-        lastGenerated = code;
-        barcodeField.select();
+        lastGenerated = claveActual();
+        if (code) barcodeField.select();
+        else skuField.select();
 
         if (descargar) {
           const link = document.createElement('a');
           link.href = previewUrl;
-          link.download = 'etiqueta_' + code + '.png';
+          link.download = 'etiqueta_' + (code || sku) + '.png';
           document.body.appendChild(link);
           link.click();
           link.remove();
         }
       } catch (error) {
-        if (error.name !== 'AbortError') showError('Se cortó la generación. Volvé a escanear el código.');
+        if (error.name !== 'AbortError') showError('Se cortó la generación. Volvé a intentar.');
       } finally {
         setBusy(false);
         inflight = null;
