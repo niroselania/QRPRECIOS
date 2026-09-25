@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Equivalencia de Códigos de Barra</title>
+  <title>Etiquetas Patagonia</title>
   <style>
     :root {
       --bg: #0f1115;
@@ -39,15 +39,16 @@
     .card h2 { font-size: 1.05rem; margin: 0 0 6px 0; }
     .card .desc { color: var(--muted); font-size: 0.9rem; margin-bottom: 16px; }
     label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
-    input[type="file"] {
+    input[type="file"], input[type="text"] {
       width: 100%;
       padding: 10px;
       background: #0f1115;
       border: 1px dashed var(--border);
       border-radius: 8px;
       color: var(--text);
-      font-size: 0.85rem;
+      font-size: 0.95rem;
     }
+    input[type="text"] { border-style: solid; font-size: 1.15rem; letter-spacing: 0.04em; }
     .status {
       display: inline-flex;
       align-items: center;
@@ -57,7 +58,7 @@
       margin-top: 10px;
     }
     .status.warn { color: var(--warn); }
-    button {
+    button, a.btn {
       width: 100%;
       padding: 13px;
       background: var(--accent);
@@ -68,8 +69,16 @@
       font-weight: 600;
       cursor: pointer;
       margin-top: 8px;
+      text-align: center;
+      text-decoration: none;
+      display: block;
     }
-    button:hover { background: var(--accent-hover); }
+    button:hover, a.btn:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.55; cursor: wait; }
+    .botones { display: flex; gap: 10px; margin-top: 16px; }
+    .botones button, .botones a.btn { margin-top: 0; flex: 1; }
+    a.btn.secondary { background: #2a2e38; }
+    a.btn.secondary:hover { background: #363b47; }
     .flash {
       background: #3a2020;
       border: 1px solid #7a3a3a;
@@ -79,6 +88,23 @@
       margin-bottom: 20px;
       font-size: 0.9rem;
     }
+    .flash.ok {
+      background: #1b2a22;
+      border-color: #2f5a42;
+      color: #9ee0be;
+    }
+    .preview {
+      margin-top: 20px;
+      background: white;
+      border-radius: 8px;
+      padding: 16px;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      min-height: 90px;
+    }
+    .preview.visible { display: flex; }
+    .preview img { image-rendering: pixelated; max-width: 100%; }
     .footer-note {
       color: var(--muted);
       font-size: 0.78rem;
@@ -86,69 +112,203 @@
       margin-top: 24px;
       line-height: 1.5;
     }
+    .busy { color: var(--muted); font-size: 0.85rem; margin-top: 10px; display: none; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>Equivalencia de Códigos de Barra</h1>
-    <p class="sub">Completa EQUIVALENCIA con el código de barra de cada prenda, cruzando SKU + Color + Talle contra la planilla de equivalencias.</p>
+    <h1>Etiquetas</h1>
+    <p class="sub">Cargá las planillas una vez y después escaneá o pegá el código de barras para imprimir la etiqueta con precio sin IVA y con IVA.</p>
 
     {% with messages = get_flashed_messages() %}
       {% if messages %}
         {% for m in messages %}
-          <div class="flash">{{ m }}</div>
+          <div class="flash {% if 'correctamente' in m %}ok{% endif %}">{{ m }}</div>
         {% endfor %}
       {% endif %}
     {% endwith %}
 
-    <form action="/procesar" method="post" enctype="multipart/form-data">
+    <form action="/subir-equivalencia" method="post" enctype="multipart/form-data">
       <div class="card">
-        <h2>1. Planilla grande (Equivalencia)</h2>
-        <div class="desc">El export con todos los productos y su columna CODIGOS. Podés omitir este paso si ya subiste una antes: se reutiliza la última cargada.</div>
+        <h2>1. Planilla de equivalencia</h2>
+        <div class="desc">El export con códigos de barra, SKU, color y talle. Solo hay que volver a subirla cuando se actualice.</div>
         <label for="grande">Archivo .xls / .xlsx</label>
-        <input type="file" id="grande" name="grande" accept=".xls,.xlsx">
+        <input type="file" id="grande" name="grande" accept=".xls,.xlsx" required>
         {% if grande_cached %}
-          <div class="status">● Hay una planilla grande cargada: {{ grande_info }}</div>
+          <div class="status">● Equivalencia cargada: {{ grande_info }}</div>
         {% else %}
-          <div class="status warn">● Todavía no cargaste ninguna. Es obligatorio la primera vez.</div>
+          <div class="status warn">● Todavía no cargaste la planilla de equivalencia.</div>
         {% endif %}
+        <button type="submit">Guardar equivalencia</button>
       </div>
-
-      <div class="card">
-        <h2>2. Planilla de stock</h2>
-        <div class="desc">La planilla de stock a completar: usa SKU, COLOR y TALLE (columnas C, D y E en tu archivo).</div>
-        <label for="pedido">Archivo .xlsx (debe tener columnas EQUIVALENCIA, SKU, COLOR y TALLE)</label>
-        <input type="file" id="pedido" name="pedido" accept=".xlsx" required>
-      </div>
-
-      <button type="submit">Procesar y descargar resultado</button>
     </form>
 
     <form action="/subir-stock" method="post" enctype="multipart/form-data">
       <div class="card">
-        <h2>Planilla STOCK con precios</h2>
-        <div class="desc">Subí el STOCK actualizado. La etiqueta toma RETAIL de la columna K como precio sin IVA y calcula IVA 21%.</div>
+        <h2>2. Planilla de stock</h2>
+        <div class="desc">Usa la columna RETAIL como precio <strong>sin IVA</strong> y calcula el 21% para mostrar ambos en la etiqueta.</div>
         <label for="stock">Archivo .xlsx</label>
         <input type="file" id="stock" name="stock" accept=".xlsx" required>
         {% if stock_cached %}
-          <div class="status">Planilla cargada: {{ stock_info }}</div>
+          <div class="status">● Stock cargado: {{ stock_info }}</div>
         {% else %}
-          <div class="status warn">Todavía no cargaste la planilla STOCK.</div>
+          <div class="status warn">● Todavía no cargaste la planilla de STOCK.</div>
         {% endif %}
-        <button type="submit">Guardar STOCK y precios</button>
+        <button type="submit">Guardar stock y precios</button>
       </div>
     </form>
 
-    <div class="footer-note">
-      Busca por SKU + Color + Talle exacto y completa la primera columna "EQUIVALENCIA"
-      con el valor de CODIGOS de la planilla de equivalencias. El resto de la planilla queda intacta.
+    <div class="card">
+      <h2>3. Generar etiqueta (15 x 30 mm)</h2>
+      <div class="desc">Pegá el número o escanealo con la lectora. Al terminar el beep, la etiqueta se arma sola.</div>
+      {% if not grande_cached or not stock_cached %}
+        <div class="flash">Falta cargar equivalencia y stock antes de generar etiquetas.</div>
+      {% endif %}
+      <form id="form-etiqueta" autocomplete="off">
+        <label for="barcode">Código de barras</label>
+        <input type="text" id="barcode" name="barcode" placeholder="Escaneá o pegá el código" inputmode="numeric" autofocus>
+        <div class="busy" id="busy">Generando etiqueta…</div>
+        <div class="flash" id="error" style="display:none; margin:12px 0 0;"></div>
+        <div class="botones">
+          <button type="submit" id="btn-preview">Previsualizar</button>
+          <a class="btn secondary" id="link-descargar" href="#">Descargar PNG</a>
+        </div>
+      </form>
+      <div class="preview" id="preview">
+        <img id="preview-img" alt="Vista previa de la etiqueta">
+      </div>
     </div>
 
-    <div class="card" style="text-align:center;">
-      <h2>¿Necesitás reimprimir una etiqueta suelta?</h2>
-      <div class="desc">Generá una etiqueta de 4 x 2 cm a partir del código, color, talle y descripción.</div>
-      <a class="btn" href="/etiqueta" style="display:inline-block; padding:12px 24px; background:var(--accent); color:white; border-radius:8px; text-decoration:none; font-weight:600;">Generar etiqueta</a>
+    <div class="footer-note">
+      La lectora suele mandar Enter al final: con eso alcanza. Si no lo manda, se espera a que deje de escribir y recién ahí se busca el producto. El PNG sale a 300 DPI en 15 x 30 mm.
     </div>
   </div>
+
+  <script>
+    const barcodeField = document.getElementById('barcode');
+    const preview = document.getElementById('preview');
+    const previewImg = document.getElementById('preview-img');
+    const errorBox = document.getElementById('error');
+    const busy = document.getElementById('busy');
+    const btnPreview = document.getElementById('btn-preview');
+    const form = document.getElementById('form-etiqueta');
+
+    let idleTimer = null;
+    let inflight = null;
+    let lastGenerated = '';
+    let previewUrl = '';
+
+    function normalizeBarcode(value) {
+      return String(value || '').replace(/[\r\n\t]/g, '').replace(/\s+/g, '').trim();
+    }
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.style.display = message ? 'block' : 'none';
+    }
+
+    function setBusy(on) {
+      busy.style.display = on ? 'block' : 'none';
+      btnPreview.disabled = on;
+    }
+
+    function scheduleGenerate() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        const code = normalizeBarcode(barcodeField.value);
+        if (code.length >= 8) generar(false);
+      }, 220);
+    }
+
+    barcodeField.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        clearTimeout(idleTimer);
+        generar(false);
+      }
+    });
+
+    barcodeField.addEventListener('input', () => {
+      const code = normalizeBarcode(barcodeField.value);
+      if (barcodeField.value !== code) barcodeField.value = code;
+      if (code && code !== lastGenerated) lastGenerated = '';
+      if (code.length >= 8) scheduleGenerate();
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      clearTimeout(idleTimer);
+      generar(false);
+    });
+
+    document.getElementById('link-descargar').addEventListener('click', (event) => {
+      event.preventDefault();
+      generar(true);
+    });
+
+    async function generar(descargar) {
+      const code = normalizeBarcode(barcodeField.value);
+      barcodeField.value = code;
+      if (code.length < 8) {
+        showError('El código de barras está incompleto.');
+        return;
+      }
+      if (!descargar && code === lastGenerated) return;
+
+      clearTimeout(idleTimer);
+      if (inflight) inflight.abort();
+      inflight = new AbortController();
+
+      setBusy(true);
+      showError('');
+      try {
+        const body = new URLSearchParams({ barcode: code });
+        if (descargar) body.set('descargar', '1');
+        const response = await fetch('/etiqueta/generar', {
+          method: 'POST',
+          headers: {
+            'Accept': 'image/png, application/json',
+            'X-Requested-With': 'fetch',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body,
+          signal: inflight.signal,
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!response.ok || contentType.includes('application/json')) {
+          let message = 'No pude generar la etiqueta.';
+          try {
+            const data = await response.json();
+            if (data.error) message = data.error;
+          } catch (_) {}
+          showError(message);
+          return;
+        }
+
+        const blob = await response.blob();
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = URL.createObjectURL(blob);
+        previewImg.src = previewUrl;
+        preview.classList.add('visible');
+        lastGenerated = code;
+        barcodeField.select();
+
+        if (descargar) {
+          const link = document.createElement('a');
+          link.href = previewUrl;
+          link.download = 'etiqueta_' + code + '.png';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+        }
+      } catch (error) {
+        if (error.name !== 'AbortError') showError('Se cortó la generación. Volvé a escanear el código.');
+      } finally {
+        setBusy(false);
+        inflight = null;
+      }
+    }
+  </script>
 </body>
 </html>

@@ -1,42 +1,14 @@
-# Equivalencia de Códigos de Barra
+# Etiquetas Patagonia
 
-App web simple para cruzar una planilla de pedido de un proveedor (columnas SKU y Color)
-contra la planilla grande de "Equivalencia" (export tipo Crystal Reports) y devolver,
-para cada línea del pedido, el/los código(s) de barra correspondientes.
-
-## Cómo matchea
-
-- De la **planilla grande** usa la columna A (Código de barra) y la columna B (Artículo,
-  formato `SKU COLOR`, por ejemplo `28465 FEA`).
-- De la **planilla de pedido** usa la columna A (SKU) y la columna B (Color).
-- Arma la clave `SKU COLOR` de la planilla de pedido y busca coincidencia exacta contra
-  la columna Artículo de la planilla grande.
-- **No filtra por Talle.** Como un mismo SKU+Color tiene un código de barra distinto por
-  cada talle, si hay varios talles vas a ver varios códigos candidatos en el resultado,
-  cada uno con su talle entre paréntesis, para que elijas el correcto a mano. Si hay una
-  sola coincidencia, se pone directo el código.
+App para imprimir etiquetas de 15 x 30 mm a partir de un código de barras, cruzando la
+planilla de equivalencia (código → SKU, color, talle) con la planilla de STOCK (precio
+RETAIL sin IVA). En la etiqueta figuran el precio sin IVA y el mismo con IVA 21%.
 
 ## Uso
 
-1. Abrí la app en el navegador.
-2. Subí la planilla grande de Equivalencia (`.xls` o `.xlsx`). Solo hace falta subirla la
-   primera vez o cuando tengas una versión nueva — queda guardada en el servidor y se
-   reutiliza en los próximos pedidos.
-3. Subí la planilla de pedido del proveedor.
-4. Tocá "Procesar y descargar resultado". Se descarga un Excel igual al de pedido, con dos
-   columnas nuevas al final: `Código(s) de Barra` y `Cantidad de Coincidencias`.
-
-## Generar etiqueta suelta (reimpresión)
-
-Desde el botón "Generar etiqueta" en la página principal (o entrando directo a `/etiqueta`)
-podés crear una etiqueta individual de **4 x 2 cm** ingresando solo **SKU, Color y Talle**.
-La descripción de la prenda y el código de barra se buscan solos por coincidencia exacta
-contra la planilla grande cargada (la misma que usa el procesamiento de pedidos). Genera un
-PNG a 300 DPI con el tamaño físico exacto de la etiqueta (queda en los metadatos del
-archivo), con el código de barra real generado a partir del número encontrado (EAN-13,
-UPC-A o Code128 según el largo del código). Al imprimir el PNG a "tamaño real" / 100% (sin
-ajustar a página) sale del tamaño correcto. Necesita tener una planilla grande cargada
-previamente desde la página principal.
+1. Subí la planilla de equivalencia (`.xls` o `.xlsx`). Queda guardada hasta que cargues otra.
+2. Subí la planilla de STOCK (`.xlsx`, solapa STOCK, columna RETAIL = precio sin IVA).
+3. Escaneá o pegá el código de barras. La etiqueta se arma sola.
 
 ## Deploy en Portainer (Docker Compose)
 
