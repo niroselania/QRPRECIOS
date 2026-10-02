@@ -140,7 +140,14 @@
         overflow: hidden !important;
       }
       body { display: block !important; }
-      body > .wrap { display: contents !important; }
+      body > .wrap {
+        display: block !important;
+        width: 15mm !important;
+        height: 30mm !important;
+        max-width: 15mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
       .wrap > :not(#preview) { display: none !important; }
       #preview, #preview img { visibility: visible !important; }
       #preview {
@@ -348,14 +355,12 @@
       event.preventDefault();
       const ok = await generar();
       if (!ok) return;
-      if (previewImg.complete) {
+      try {
+        await previewImg.decode();
         window.print();
-        return;
+      } catch (_) {
+        showError('No pude cargar la imagen de la etiqueta para imprimir.');
       }
-      previewImg.onload = () => {
-        previewImg.onload = null;
-        window.print();
-      };
     });
 
     async function generar() {
