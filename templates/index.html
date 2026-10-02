@@ -367,11 +367,6 @@
       }
       try {
         await previewImg.decode();
-        printWindow.onload = () => {
-          printWindow.onload = null;
-          printWindow.focus();
-          printWindow.print();
-        };
         printWindow.document.open();
         printWindow.document.write(`<!doctype html>
           <html lang="es"><head><meta charset="utf-8"><title>Etiqueta</title>
@@ -381,6 +376,9 @@
             img { display: block; width: 15mm; height: 30mm; }
           </style></head><body><img src="${previewImg.src}" alt="Etiqueta"></body></html>`);
         printWindow.document.close();
+        await printWindow.document.querySelector('img').decode();
+        printWindow.focus();
+        printWindow.print();
       } catch (_) {
         printWindow.close();
         showError('No pude cargar la imagen de la etiqueta para imprimir.');
