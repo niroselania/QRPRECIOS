@@ -352,10 +352,8 @@ def _resolver_precio(datos):
             return None, _error_etiqueta(f"No encontré el SKU {sku} en color {color}.")
         opciones = coincidencias
 
-    # El índice agrupa las filas de cada SKU + color, así que los talles
-    # no generan etiquetas duplicadas. Si el SKU tiene más de un color,
-    # pedimos elegirlo aunque ambos colores tengan el mismo precio.
-    if len(opciones) == 1:
+    precios = {op["precio_sin_iva"] for op in opciones}
+    if len(opciones) == 1 or len(precios) == 1:
         return opciones[0], None
 
     return None, jsonify({"opciones": opciones})

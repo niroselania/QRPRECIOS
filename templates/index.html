@@ -133,25 +133,11 @@
         background: white;
         width: 15mm;
         height: 30mm;
-        min-width: 15mm;
-        min-height: 30mm;
-        max-width: 15mm;
-        max-height: 30mm;
-        overflow: hidden !important;
       }
-      body { display: block !important; }
-      body > .wrap {
-        display: block !important;
-        width: 15mm !important;
-        height: 30mm !important;
-        max-width: 15mm !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-      .wrap > :not(#preview) { display: none !important; }
-      #preview, #preview img { visibility: visible !important; }
+      body * { visibility: hidden; }
+      #preview, #preview img { visibility: visible; }
       #preview {
-        position: fixed;
+        position: absolute;
         left: 0;
         top: 0;
         margin: 0;
@@ -165,7 +151,6 @@
         display: flex !important;
       }
       #preview img {
-        display: block;
         width: 15mm;
         height: 30mm;
         max-width: none;
@@ -353,36 +338,16 @@
 
     document.getElementById('link-imprimir').addEventListener('click', async (event) => {
       event.preventDefault();
-      // Abrimos la ventana durante el gesto del usuario para que el navegador
-      // no bloquee el popup mientras esperamos la respuesta del servidor.
-      const printWindow = window.open('', '_blank', 'width=420,height=620');
-      if (!printWindow) {
-        showError('El navegador bloqueó la ventana de impresión. Permití las ventanas emergentes para este sitio.');
-        return;
-      }
       const ok = await generar();
-      if (!ok) {
-        printWindow.close();
+      if (!ok) return;
+      if (previewImg.complete) {
+        window.print();
         return;
       }
-      try {
-        await previewImg.decode();
-        printWindow.document.open();
-        printWindow.document.write(`<!doctype html>
-          <html lang="es"><head><meta charset="utf-8"><title>Etiqueta</title>
-          <style>
-            @page { size: 15mm 30mm; margin: 0; }
-            html, body { margin: 0; padding: 0; width: 15mm; height: 30mm; overflow: hidden; }
-            img { display: block; width: 15mm; height: 30mm; }
-          </style></head><body><img src="${previewImg.src}" alt="Etiqueta"></body></html>`);
-        printWindow.document.close();
-        await printWindow.document.querySelector('img').decode();
-        printWindow.focus();
-        printWindow.print();
-      } catch (_) {
-        printWindow.close();
-        showError('No pude cargar la imagen de la etiqueta para imprimir.');
-      }
+      previewImg.onload = () => {
+        previewImg.onload = null;
+        window.print();
+      };
     });
 
     async function generar() {
