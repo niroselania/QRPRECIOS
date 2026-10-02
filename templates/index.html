@@ -353,12 +353,36 @@
 
     document.getElementById('link-imprimir').addEventListener('click', async (event) => {
       event.preventDefault();
+      // Abrimos la ventana durante el gesto del usuario para que el navegador
+      // no bloquee el popup mientras esperamos la respuesta del servidor.
+      const printWindow = window.open('', '_blank', 'width=420,height=620');
+      if (!printWindow) {
+        showError('El navegador bloqueó la ventana de impresión. Permití las ventanas emergentes para este sitio.');
+        return;
+      }
       const ok = await generar();
-      if (!ok) return;
+      if (!ok) {
+        printWindow.close();
+        return;
+      }
       try {
         await previewImg.decode();
-        window.print();
+        printWindow.onload = () => {
+          printWindow.onload = null;
+          printWindow.focus();
+          printWindow.print();
+        };
+        printWindow.document.open();
+        printWindow.document.write(`<!doctype html>
+          <html lang="es"><head><meta charset="utf-8"><title>Etiqueta</title>
+          <style>
+            @page { size: 15mm 30mm; margin: 0; }
+            html, body { margin: 0; padding: 0; width: 15mm; height: 30mm; overflow: hidden; }
+            img { display: block; width: 15mm; height: 30mm; }
+          </style></head><body><img src="${previewImg.src}" alt="Etiqueta"></body></html>`);
+        printWindow.document.close();
       } catch (_) {
+        printWindow.close();
         showError('No pude cargar la imagen de la etiqueta para imprimir.');
       }
     });
